@@ -4,20 +4,14 @@ import sys
 import json
 import pickle
 import argparse
-from typing import Tuple, List, Union, Any
-
 # ML libraries
 import torch
 import mlflow
 import numpy as np
 import pandas as pd
-import time
-
-from numpy import ndarray
 # Tools
 from tqdm import tqdm
 import matplotlib
-
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 # Sklearn models
@@ -35,8 +29,7 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.model_selection import permutation_test_score
 from sklearn.inspection import permutation_importance
-from sklearn.metrics import roc_auc_score, roc_curve, accuracy_score, precision_recall_fscore_support, f1_score, \
-    confusion_matrix
+from sklearn.metrics import roc_auc_score, roc_curve, accuracy_score, precision_recall_fscore_support, f1_score, confusion_matrix
 # My libraries
 from feats import FeatureExtractor
 from util import load_config_from_json
@@ -68,8 +61,7 @@ def run_exp(path_data_: str, path_wav_: str, path_results_: str, filters: dict, 
     ADReSS_metadata = pd.read_csv(path_data_, decimal=',')
     # Make the metadata for the DICOPERIA dataset
     path_exp_metadata = os.path.join(path_results_, 'exp_metadata.csv')
-    exp_metadata = make_ADReSS_metadata(path_exp_metadata, ADReSS_metadata,
-                                        filters)  # ya no haría falta en el caso de ADReSS
+    exp_metadata = make_ADReSS_metadata(path_exp_metadata, ADReSS_metadata, filters) # ya no haría falta en el caso de ADReSS
 
     # empezar aqui
     # Make the subsets
@@ -99,16 +91,16 @@ def run_exp(path_data_: str, path_wav_: str, path_results_: str, filters: dict, 
             # Save the test features
             np.save(os.path.join(path_results_, train_path.replace('train_feats', 'test_feats')), test_feats)
             np.save(os.path.join(path_results_, train_path.replace('train_feats', 'test_labels')), test_label)
-            # print(test_feats.shape)
-            # print(test_label.shape)
+            #print(test_feats.shape)
+            #print(test_label.shape)
         else:
             print("Loading testing feats from disk...")
             test_feats = np.load(os.path.join(path_results_, train_path.replace('train_feats', 'test_feats')),
                                  allow_pickle=True)
             test_label = np.load(os.path.join(path_results_, train_path.replace('train_feats', 'test_labels')),
                                  allow_pickle=True)
-            # print(test_feats.shape)
-            # print(test_label.shape)
+            #print(test_feats.shape)
+            #print(test_label.shape)
 
         # Training phase
         path_model = os.path.join(exp_name, f'{model_name}_{num_fold}_results')
@@ -117,9 +109,8 @@ def run_exp(path_data_: str, path_wav_: str, path_results_: str, filters: dict, 
 
         # Configure the model
         print("Configuring model...")
-        feature_type = feature_config_["feature_type"]
         model, x_train, y_train, test_feats, test_label = config_model(model_name, train_feats, train_labels,
-                                                                       test_feats, test_label, seed, feature_type)
+                                                                       test_feats, test_label, seed)
         print("Model configured.")
         pikle_model = os.path.join(path_model, f'{model_name}_{num_fold}.pkl')
         if not os.path.exists(pikle_model):
@@ -129,46 +120,6 @@ def run_exp(path_data_: str, path_wav_: str, path_results_: str, filters: dict, 
             # Save the model
             pickle.dump(model, open(pikle_model, 'wb'))
             print("Model fitted and dumped.")
-
-            if (model_name == 'LogisticRegressiongfgf'):
-                try:
-                    print("Calculating the Permutation Importance...")
-                    feature_names = [f"feature {i}" for i in range(x_train.shape[1])]
-                    forest = RandomForestClassifier(random_state=0)
-                    forest.fit(x_train, y_train)
-
-                    matrix_feats = np.empty((0, test_feats[0].shape[1]))
-                    matrix_labels = np.empty((0, 1))
-                    for feat, label in zip(test_feats, test_label):
-                        matrix_feats = np.vstack((matrix_feats, feat))
-                        label = np.array([label] * feat.shape[0]).reshape(-1, 1)
-                        matrix_labels = np.vstack((matrix_labels, label))
-                    matrix_labels = matrix_labels.ravel()
-
-                    start_time = time.time()
-                    result = permutation_importance(
-                        forest, matrix_feats, matrix_labels, n_repeats=10, random_state=42, n_jobs=2
-                    )
-                    elapsed_time = time.time() - start_time
-                    print(f"Elapsed time to compute the importances: {elapsed_time:.3f} seconds")
-
-                    forest_importances = pd.Series(result.importances_mean, index=feature_names)
-                    path_importances = os.path.join(path_results_,
-                                                    f'importances_{feature_config_["feature_type"]}_{feature_config_["extra_features"]}.csv')
-                    forest_importances.to_csv(path_importances)
-
-                    fig, ax = plt.subplots()
-                    forest_importances.plot.bar(ax=ax)
-                    ax.set_title(
-                        f'Feature importances using permutation {feature_config_["feature_type"]}_{feature_config_["extra_features"]}')
-                    ax.set_ylabel("Mean accuracy decrease")
-                    ax.set_xticklabels([])
-                    fig.tight_layout()
-                    plt.savefig(path_importances.replace('.csv', '.png'))
-                    plt.close()
-                    print("Permutation Importance calculated.")
-                except Exception as e:
-                    print(f"Error calculating the Permutation Importance: {e}")
         else:
             print("Loading model from disk...")
             model = pickle.load(open(pikle_model, 'rb'))
@@ -177,35 +128,7 @@ def run_exp(path_data_: str, path_wav_: str, path_results_: str, filters: dict, 
         score_path = os.path.join(path_model, f'{model_name}_{num_fold}scores.pkl')
 
         print("Making scores...")
-        all_scores = score_sklearn(model, test_feats, test_label, score_path, seed)
-        feature_name = f'{feature_config_["feature_type"]}_plus - {feature_config_["extra_features"]}'
-
-        list_scores = ['acc_score', 'auc_score', 'f1_scr', 'sensitivity', 'specificity',
-                       'auc_score_chunk', 'auc_score_median', 'auc_score_percentil75', 'acc_score_meanp',
-                       'acc_score_median', 'acc_score_percentil75']
-
-        for score in list_scores:
-
-            # si el nombre es bert_wav2vec_plus - True, bert_wav2vec_plus - True, XVector_plus - False o wav2vec_plus - True no hacer nada
-            if feature_name not in ['bert_wav2vec_plus - True', 'wav2vec_plus - True', 'XVector_plus - False', 'BERT_embedding_plus - True']:
-                # comprobar si existe el path para guardar los scores
-                if not os.path.exists(os.path.join(path_results_, f'{score}.csv')):
-                    df = pd.DataFrame(data=[all_scores[score]], index=[feature_name], columns=[model_name])
-                    df.to_csv(os.path.join(path_results_, f'{score}.csv'))
-                else:
-                    # Leer el archivo CSV existente
-                    df = pd.read_csv(os.path.join(path_results_, f'{score}.csv'), index_col=0)
-
-                    # Si el modelo no está en las columnas, agregarlo
-                    if model_name not in df.columns:
-                        df[model_name] = pd.NA  # Añadir una nueva columna para el modelo
-
-                    # Actualizar o añadir la fila para la característica
-                    df.loc[feature_name, model_name] = all_scores[score]
-
-                    # Guardar el DataFrame actualizado en el CSV
-                    df.to_csv(os.path.join(path_results_, f'{score}.csv'))
-
+        all_scores = score_sklearn(model, test_feats, test_label, score_path)
         print("Scores made.")
 
         # Log the results using mlflow
@@ -249,79 +172,34 @@ def mlflow_run(filters: dict, feature_config: dict, model_name: str, num_fold: i
             mlflow.log_param(k, v)
 
 
-def score_sklearn(model_trained, test_feats: list, test_label: list, path_to_save: str, seed: int) -> dict:
+def score_sklearn(model_trained, test_feats: list, test_label: list, path_to_save: str) -> dict:
     """
     Calculate a set of performance metrics using sklearn
     :param model_trained: a model trained using for inference
     :param test_feats: a list of test feats
     :param test_label: a list of test labels
     :param path_to_save: Path to save the results
-    :param seed: Seed to be used
     :return: a set of performance metrics: confusion matrix, f1 score, f-beta score, precision, recall, and auc score
     """
     model_name = model_trained.__class__.__name__
     # Start testing
     y_feats, y_true = test_feats, test_label
+    y_score = make_prediction(model_trained, model_name, y_feats)
 
-    y_true_chunk = np.empty((0, 1))
-    for feat, label in zip(y_feats, y_true):
-        label = np.array([label] * feat.shape[0]).reshape(-1, 1)
-        y_true_chunk = np.vstack((y_true_chunk, label))
-    y_true_chunk = y_true_chunk.ravel()
-
-    y_score, y_score_meanp, y_score_chunk, y_score_median, y_score_percentil75 = make_prediction(model_trained,
-                                                                                                 model_name, y_feats)
+    avg_importance, all_importances = make_permutations(model_trained, model_name, y_feats, y_true, n_repeats=30, random_state=42)
+    print(f'avg_importance: {avg_importance}')
+    print(f'avg_importance shape: {avg_importance.shape}')
+    print(f'all_importances: {all_importances}')
+    print(f'all_importances shape: {all_importances.shape}')
 
     # Calculate the auc_score, FP-rate, and TP-rate
-    # print(f'y_true: {y_true} type: {type(y_true)}')
-    # print(f'y_score: {y_score} type: {type(y_score)}')
     sklearn_roc_auc_score = roc_auc_score(y_true, y_score)
     sklear_fpr, sklearn_tpr, n_thresholds = roc_curve(y_true, y_score)
-
-    # --------------------------------------------------------------------------------------------
-    # 24-10-2024. Calcular curva ROC para la media de probabilidades
-    # print(f'y_score_meanp: {y_score_meanp} type: {type(y_score_meanp)}')
-    # print(f'y_score_meanp: {y_score_meanp} type: {type(y_score_meanp)}')
-    sklearn_roc_auc_score_meanp = roc_auc_score(y_true, y_score_meanp)
-    sklear_fpr_meanp, sklearn_tpr_meanp, n_thresholds_meanp = roc_curve(y_true, y_score_meanp)
-
-    # 18-10-2024. Calcular curva ROC para los scores de los chunks
-    # print(f'y_true_chunk: {y_true_chunk} type: {type(y_true_chunk)}')
-    # print(f'y_score_chunk: {y_score_chunk} type: {type(y_score_chunk)}')
-    sklearn_roc_auc_score_chunk = roc_auc_score(y_true_chunk, y_score_chunk)
-    sklear_fpr_chunk, sklearn_tpr_chunk, n_thresholds_chunk = roc_curve(y_true_chunk, y_score_chunk)
-
-    sklearn_roc_auc_score_median = roc_auc_score(y_true, y_score_median)
-    sklear_fpr_median, sklearn_tpr_median, n_thresholds_median = roc_curve(y_true, y_score_median)
-
-    sklearn_roc_auc_score_percentil75 = roc_auc_score(y_true, y_score_percentil75)
-    sklear_fpr_percentil75, sklearn_tpr_percentil75, n_thresholds_percentil75 = roc_curve(y_true, y_score_percentil75)
-    # --------------------------------------------------------------------------------------------
 
     # Make prediction using a threshold that maximizes the difference between TPR and FPR
     optimal_idx = np.argmax(sklearn_tpr - sklear_fpr)
     optimal_threshold = n_thresholds[optimal_idx]
     y_pred = [1 if scr > optimal_threshold else 0 for scr in y_score]
-
-    # 24-10-2024. Make prediction using a threshold that maximizes the difference between TPR and FPR
-    optimal_idx_meanp = np.argmax(sklearn_tpr_meanp - sklear_fpr_meanp)
-    optimal_threshold_meanp = n_thresholds_meanp[optimal_idx_meanp]
-    y_pred_meanp = [1 if scr > optimal_threshold_meanp else 0 for scr in y_score_meanp]
-
-    # 18-10-2024. Make prediction using a threshold that maximizes the difference between TPR and FPR
-    optimal_idx_chunk = np.argmax(sklearn_tpr_chunk - sklear_fpr_chunk)
-    optimal_threshold_chunk = n_thresholds_chunk[optimal_idx_chunk]
-    y_pred_chunk = [1 if scr > optimal_threshold_chunk else 0 for scr in y_score_chunk]
-
-    # 18-10-2024. Make prediction using a threshold that maximizes the difference between TPR and FPR
-    optimal_idx_median = np.argmax(sklearn_tpr_median - sklear_fpr_median)
-    optimal_threshold_median = n_thresholds_median[optimal_idx_median]
-    y_pred_median = [1 if scr > optimal_threshold_median else 0 for scr in y_score_median]
-
-    # 18-10-2024. Make prediction using a threshold that maximizes the difference between TPR and FPR
-    optimal_idx_percentil75 = np.argmax(sklearn_tpr_percentil75 - sklear_fpr_percentil75)
-    optimal_threshold_percentil75 = n_thresholds_percentil75[optimal_idx_percentil75]
-    y_pred_percentil75 = [1 if scr > optimal_threshold_percentil75 else 0 for scr in y_score_percentil75]
 
     # Calculate Precision, Recall, F1, and F-beta scores
     acc = accuracy_score(y_true, y_pred)
@@ -335,10 +213,6 @@ def score_sklearn(model_trained, test_feats: list, test_label: list, path_to_sav
     tn, fp, fn, tp = confusion_mx.ravel()
     sensitivity = tp / (tp + fn)
     specificity = tn / (tn + fp)
-
-    acc_meanp = accuracy_score(y_true, y_pred_meanp)
-    acc_median = accuracy_score(y_true, y_pred_median)
-    acc_percentil75 = accuracy_score(y_true, y_pred_percentil75)
 
     dict_scores = {
         'model_name': model_name,
@@ -359,51 +233,11 @@ def score_sklearn(model_trained, test_feats: list, test_label: list, path_to_sav
         'f_beta': f_beta.tolist(),
         'precision': precision.tolist(),
         'recall': recall.tolist(),
-        'auc_score_chunk': float(sklearn_roc_auc_score_chunk),
-        'auc_score_median': float(sklearn_roc_auc_score_median),
-        'auc_score_percentil75': float(sklearn_roc_auc_score_percentil75),
-        'acc_score_meanp': float(acc_meanp),
-        'acc_score_median': float(acc_median),
-        'acc_score_percentil75': float(acc_percentil75),
     }
-
-    # try:
-    #     print("Experiment - Calculating the P-Value using permutation test.")
-    #     estimator = model_trained.__class__(**model_trained.get_params())
-    #
-    #     print(f'y_feats[0].shape[1]: {y_feats[0].shape[1]}')
-    #     matrix_feats = np.empty((0, y_feats[0].shape[1]))
-    #     matrix_labels = np.empty((0, 1))
-    #     for feat, label in zip(y_feats, y_true):
-    #         # print(f'feat.shape: {feat.shape}')
-    #         matrix_feats = np.vstack((matrix_feats, feat))
-    #         # print(f'label: {label}')
-    #         # print(f'label.shape: {label.shape}')
-    #         label = np.array([label] * feat.shape[0]).reshape(-1, 1)
-    #         # print(f'label: {label}')
-    #         # print(f'label.shape: {label.shape}')
-    #         matrix_labels = np.vstack((matrix_labels, label))
-    #         # print(f'matrix_labels.shape: {matrix_labels.shape}')
-    #     matrix_labels = matrix_labels.ravel()
-    #
-    #     score, permutation_scores, p_value = permutation_test_score(
-    #         estimator,
-    #         matrix_feats,
-    #         matrix_labels,
-    #         random_state=seed,
-    #         n_jobs=-1,
-    #     )
-    #     dict_scores["P-Value"] = p_value
-    #     dict_scores["Permutation-Score"] = score
-    #
-    # except Exception as e:
-    #     print(f"Error calculating the Permutation Metrics: {e}")
 
     # Plot useful metric graphs
     if path_to_save is not None:
         # Plot the ROC curve for the model
-        # print(f'sklearn_tpr: {sklearn_tpr}')
-        # print(f'sklear_fpr: {sklear_fpr}')
         plt.plot(sklear_fpr, sklearn_tpr, marker='.', label=model_name)
         plt.title('ROC Curve')
         # axis labels
@@ -413,60 +247,6 @@ def score_sklearn(model_trained, test_feats: list, test_label: list, path_to_sav
         plt.legend()
         # Save the ROC curve plot
         plt.savefig(path_to_save.replace('.pkl', '_ROC.png'))
-        plt.close()
-
-        # 24-10-2024. Plotear curva ROC para la media de probabilidades
-        # print(f'sklearn_tpr_meanp: {sklearn_tpr_meanp}')
-        # print(f'sklear_fpr_meanp: {sklear_fpr_meanp}')
-        plt.plot(sklear_fpr_meanp, sklearn_tpr_meanp, marker='.', label=model_name)
-        plt.title('ROC Curve for Mean Probabilities')
-        # axis labels
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        # show the legend
-        plt.legend()
-        # Save the ROC curve plot
-        plt.savefig(path_to_save.replace('.pkl', '_ROC_meanp.png'))
-        plt.close()
-
-        # 18-10-2024. Plotear curva ROC para los scores de los chunks
-        # print(f'sklearn_tpr_chunk: {sklearn_tpr_chunk}')
-        # print(f'sklear_fpr_chunk: {sklear_fpr_chunk}')
-        plt.plot(sklear_fpr_chunk, sklearn_tpr_chunk, marker='.', label=model_name)
-        plt.title('ROC Curve for Chunks')
-        # axis labels
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        # show the legend
-        plt.legend()
-        # Save the ROC curve plot
-        plt.savefig(path_to_save.replace('.pkl', '_ROC_chunk.png'))
-        plt.close()
-
-        # 18-10-2024. Plotear curva ROC para los scores de los chunks
-        # print(f'sklearn_tpr_median: {sklearn_tpr_median}')
-        # print(f'sklear_fpr_median: {sklear_fpr_median}')
-        plt.plot(sklear_fpr_median, sklearn_tpr_median, marker='.', label=model_name)
-        plt.title('ROC Curve for Median')
-        # axis labels
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        # show the legend
-        plt.legend()
-        # Save the ROC curve plot
-        plt.savefig(path_to_save.replace('.pkl', '_ROC_median.png'))
-        plt.close()
-
-        # 18-10-2024. Plotear curva ROC para los scores de los chunks
-        plt.plot(sklear_fpr_percentil75, sklearn_tpr_percentil75, marker='.', label=model_name)
-        plt.title('ROC Curve for Percentil 75')
-        # axis labels
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        # show the legend
-        plt.legend()
-        # Save the ROC curve plot
-        plt.savefig(path_to_save.replace('.pkl', '_ROC_percentil75.png'))
         plt.close()
 
         # Plot the Precision-Recall curve for the model
@@ -495,8 +275,7 @@ def score_sklearn(model_trained, test_feats: list, test_label: list, path_to_sav
     return dict_scores
 
 
-def make_prediction(model, model_name: str, y_feats: list) -> tuple[
-    list[Union[float, Any]], list[float], ndarray, list[float], list[float]]:
+def make_prediction(model, model_name: str, y_feats: list) -> list:
     """
     Function to make prediction using a model
     @param model: A model to make prediction
@@ -505,12 +284,7 @@ def make_prediction(model, model_name: str, y_feats: list) -> tuple[
     @return: A list of prediction scores
     """
     # Predict the scores
-    y_score = []  # Average 0/1
-    y_score_meanp = []  # Average probability
-    y_score_median = []
-    y_score_percentil75 = []
-    y_score_chunk = []
-
+    y_score = []
     for feat_ in tqdm(y_feats, total=len(y_feats)):
         # Predict
         if model_name == 'LSTMclassifier':
@@ -530,29 +304,16 @@ def make_prediction(model, model_name: str, y_feats: list) -> tuple[
                     feat_ = feat_[:, :model.n_features_in_]
 
             # Predict
-            output_score_chunk = model.predict(feat_)
-            # probabilidad de clase positiva (1)
-            output_score_proba_chunk = model.predict_proba(feat_)[:, 1]
-            # output_score_proba_chunk = model.predict_proba(feat_)
-            # devolver output score de chunks
-            output_score = float(np.mean(output_score_chunk))
-            output_score_meanp = float(np.mean(output_score_proba_chunk))
-            output_score_median = float(np.median(output_score_proba_chunk))
-            output_score_percentil75 = float(np.percentile(output_score_proba_chunk, 75))
+            output_score = model.predict(feat_)
+            output_score = float(np.mean(output_score))
 
         # Average the scores of all segments from the input file
         y_score.append(output_score)
-        y_score_meanp.append(output_score_meanp)
-        y_score_chunk.append(output_score_proba_chunk)
-        y_score_median.append(output_score_median)
-        y_score_percentil75.append(output_score_percentil75)
-
-    y_score_chunk = np.concatenate(y_score_chunk)
-    return y_score, y_score_meanp, y_score_chunk, y_score_median, y_score_percentil75
+    return y_score
 
 
-def make_permutation_importance(model, model_name: str, y_feats: list, y_true: list, n_repeats: int = 30,
-                                random_state: int = None) -> tuple:
+def make_permutations(model, model_name: str, y_feats: list, y_true: list, n_repeats: int = 30,
+                      random_state: int = None) -> tuple:
     """
     Function to calculate permutation importance for each patient's data.
     Similar to `make_prediction`, but computes permutation importance.
@@ -570,10 +331,9 @@ def make_permutation_importance(model, model_name: str, y_feats: list, y_true: l
     all_importances = []
 
     # Loop through each patient's features and calculate permutation importance
-    for i in tqdm(range(len(y_feats)), total=len(y_feats)):
-        feat_ = y_feats[i]
-        true_label = y_true[i]  # Get the corresponding true label
+    for feat_, true_label in tqdm(y_feats, total=len(y_feats)):
 
+        # Handle LSTM model case
         if model_name == 'LSTMclassifier':
             with torch.no_grad():
                 feat_ = feat_.to('cpu')  # Ensure the feature is on CPU
@@ -582,6 +342,8 @@ def make_permutation_importance(model, model_name: str, y_feats: list, y_true: l
                 # Compute permutation importance using sklearn's function
                 result = permutation_importance(model, feat_, true_label, n_repeats=n_repeats,
                                                 random_state=random_state, scoring='accuracy')
+
+        # Handle other model types
         else:
             # Ensure feature dimension compatibility with model
             if feat_.shape[1] != model.n_features_in_:
@@ -607,107 +369,9 @@ def make_permutation_importance(model, model_name: str, y_feats: list, y_true: l
 
     return avg_importance, np.array(all_importances)
 
-
-def make_permutation_test_score(model, model_name: str, y_feats: list, y_true: list, n_permutations: int = 30,
-                                random_state: int = None) -> tuple:
-    """
-    Function to calculate permutation test score for model accuracy at the embedding level by expanding patient labels.
-
-    @param model: Trained model to use for prediction.
-    @param model_name: The name/type of model (e.g., 'LSTMclassifier').
-    @param y_feats: List of features for each patient (each containing multiple segments).
-    @param y_true: List of true labels for each patient (1 label per patient).
-    @param n_permutations: Number of permutations to perform in the test.
-    @param random_state: Seed for reproducibility.
-    @return: Average test score, permuted scores, and p-value.
-    """
-
-    # Expand patient labels to match the number of embeddings per patient
-    expanded_y_true = []
-    all_feats = []
-
-    for i in range(len(y_feats)):
-        # Multiplica la etiqueta de cada paciente por el número de embeddings que tiene
-        num_embeddings = len(y_feats[i])
-        expanded_y_true.extend([y_true[i]] * num_embeddings)  # Repetimos la etiqueta por cada embedding
-        all_feats.extend(y_feats[i])  # Añadimos todos los embeddings del paciente
-
-    # Convertimos la lista de etiquetas y embeddings en arrays numpy
-    expanded_y_true = np.array(expanded_y_true)
-    all_feats = np.array(all_feats)
-
-    # Ahora ejecutamos el test de permutación con los embeddings y las etiquetas expandidas
-    avg_test_score, permuted_scores, avg_p_value = permutation_test_score(
-        estimator=model,
-        X=all_feats,  # Todos los embeddings (ya alineados)
-        y=expanded_y_true,  # Etiquetas expandidas
-        n_permutations=n_permutations,
-        random_state=random_state,
-        scoring='accuracy',
-        n_jobs=-1
-    )
-
-    return avg_test_score, permuted_scores, avg_p_value
-
-
-# def make_permutation_test_score(model, model_name: str, y_feats: list, y_true: list, n_permutations: int = 100,
-#                                 random_state: int = None) -> tuple:
-#     """
-#     Function to calculate permutation test score for each patient's data.
-#
-#     @param model: Trained model to use for permutation test score.
-#     @param model_name: The name/type of model (e.g., 'LSTMclassifier').
-#     @param y_feats: List of features for each patient (each containing multiple segments).
-#     @param y_true: List of true labels for each patient.
-#     @param n_permutations: Number of permutations to use for the test.
-#     @param random_state: Seed for reproducibility.
-#     @return: Average permutation test score and p-value.
-#     """
-#
-#     test_scores = []
-#     p_values = []
-#
-#     for i in tqdm(range(len(y_feats)), total=len(y_feats)):
-#         feat_ = y_feats[i]
-#         true_label = y_true[i]  # Get the corresponding true label
-#
-#         if model_name == 'LSTMclassifier':
-#             with torch.no_grad():
-#                 feat_ = feat_.to('cpu')  # Ensure the feature is on CPU
-#                 true_label = np.repeat(true_label, feat_.shape[0])  # Match label length to number of segments
-#
-#                 # Perform permutation test score
-#                 score, permutation_scores, pvalue = permutation_test_score(
-#                     model, feat_, true_label, n_permutations=n_permutations, random_state=random_state,
-#                     scoring='accuracy')
-#         else:
-#             # Ensure feature dimension compatibility with model
-#             if feat_.shape[1] != model.n_features_in_:
-#                 if feat_.shape[1] < model.n_features_in_:
-#                     # Pad with zeros if fewer features than expected
-#                     feat_ = np.concatenate((feat_, np.zeros((feat_.shape[0], model.n_features_in_ - feat_.shape[1]))),
-#                                            axis=1)
-#                 else:
-#                     # Trim extra features if there are more than expected
-#                     feat_ = feat_[:, :model.n_features_in_]
-#
-#             true_label = np.repeat(true_label, feat_.shape[0])  # Repeat true label for all segments
-#
-#             score, permutation_scores, pvalue = permutation_test_score(
-#                 model, feat_, true_label, n_permutations=n_permutations, random_state=random_state, scoring='accuracy')
-#
-#         test_scores.append(score)
-#         p_values.append(pvalue)
-#
-#     avg_test_score = np.mean(test_scores)
-#     avg_p_value = np.mean(p_values)
-#
-#     return avg_test_score, avg_p_value
-
-def config_model(model_name: str, training_feats, training_labels, test_feats, test_labels, seed: int = 42, feature_type: str = 'raw'):
+def config_model(model_name: str, training_feats, training_labels, test_feats, test_labels, seed: int = 42):
     """
     Function to configure a sklearn model
-    @param feature_type:
     @param model_name: Type of the model
     @param training_feats: Training features
     @param training_labels: Training labels
@@ -716,27 +380,13 @@ def config_model(model_name: str, training_feats, training_labels, test_feats, t
     @param seed: Random seed
     @return: Configured model and a processed features with its labels
     """
-    models = {"LogisticRegression": {"c": 1,
+    models = {"LogisticRegression": {"c": 0.01,
                                      "max_iter": 40,
                                      "solver": "liblinear",
                                      "penalty": "l2",
                                      "class_weight": "balanced",
                                      "verbose": True
                                      },
-              "LogisticRegression2": {"c": 0.1,
-                                      "max_iter": 40,
-                                      "solver": "liblinear",
-                                      "penalty": "l2",
-                                      "class_weight": "balanced",
-                                      "verbose": True
-                                      },
-              "LogisticRegression3": {"c": 0.01,
-                                      "max_iter": 40,
-                                      "solver": "liblinear",
-                                      "penalty": "l2",
-                                      "class_weight": "balanced",
-                                      "verbose": True
-                                      },
               "RandomForest": {"n_estimators": 20,
                                "criterion": "gini",
                                "max_depth": None,
@@ -755,44 +405,17 @@ def config_model(model_name: str, training_feats, training_labels, test_feats, t
                       "class_weight": "balanced",
                       "verbose": True
                       },
-              "MLP2": {"learning_rate_init": 0.001,
-                       "alpha": 0.001,
-                       "solver": "sgd",
-                       "hidden_layer_sizes": [20, 20],
-                       "max_iter": 1500,
-                       "activation": "tanh",
-                       "class_weight": "balanced",
-                       "verbose": True
-                       },
-              "LinearSVM0": {"c": 10,
-                             "tol": 0.001,
-                             "max_iter": 1000,
-                             "class_weight": None,
-                             "verbose": True
-                             },
-              "LinearSVM": {"c": 1,
+              "LinearSVM": {"c": 0.1,
                             "tol": 0.001,
                             "max_iter": 1000,
                             "class_weight": None,
                             "verbose": True
-                            },
-              "LinearSVM2": {"c": 0.1,
-                             "tol": 0.001,
-                             "max_iter": 1000,
-                             "class_weight": None,
-                             "verbose": True
-                             },
-              "LinearSVM3": {"c": 0.01,
-                             "tol": 0.001,
-                             "max_iter": 1000,
-                             "class_weight": None,
-                             "verbose": True
-                             }
+                            }
               }
 
     model_args = models[model_name]
 
-    if model_name == 'LogisticRegression' or model_name == 'LogisticRegression2' or model_name == 'LogisticRegression3':
+    if model_name == 'LogisticRegression':
         model = LogisticRegression(C=float(model_args['c']),
                                    max_iter=int(model_args['max_iter']),
                                    solver=model_args['solver'],
@@ -800,15 +423,6 @@ def config_model(model_name: str, training_feats, training_labels, test_feats, t
                                    class_weight=model_args['class_weight'],
                                    random_state=seed,
                                    verbose=True)
-        if feature_type in ['BERT_embeddingD', 'wav2vecD']:
-            print(f'No se normaliza porque es {feature_type}')
-        else:
-            trans = StandardScaler()
-            min_max = MinMaxScaler()
-            # training_feats = min_max.fit_transform(training_feats)
-            training_feats = trans.fit_transform(training_feats)
-            # test_feats = np.array([min_max.transform(f) for f in test_feats])
-            test_feats = np.array([trans.transform(f) for f in test_feats])
     elif model_name == 'RandomForest':
         model = RandomForestClassifier(n_estimators=model_args['n_estimators'],
                                        criterion=model_args['criterion'],
@@ -818,36 +432,21 @@ def config_model(model_name: str, training_feats, training_labels, test_feats, t
                                        max_features=model_args['max_features'],
                                        class_weight=model_args['class_weight'],
                                        random_state=seed)
-        if feature_type in ['BERT_embeddingD', 'wav2vecD']:
-            print(f'No se normaliza porque es {feature_type}')
-        else:
-            trans = StandardScaler()
-            min_max = MinMaxScaler()
-            # training_feats = min_max.fit_transform(training_feats)
-            training_feats = trans.fit_transform(training_feats)
-            # test_feats = np.array([min_max.transform(f) for f in test_feats])
-            test_feats = np.array([trans.transform(f) for f in test_feats])
-    elif model_name == 'LinearSVM' or model_name == 'LinearSVM2' or model_name == 'LinearSVM3' or model_name == 'LinearSVM0':
+    elif model_name == 'LinearSVM':
         model = SVC(C=model_args['c'],
                     tol=model_args['tol'],
                     max_iter=model_args['max_iter'],
                     verbose=model_args['verbose'],
-                    random_state=seed,
-                    probability=True)
+                    random_state=seed)
 
-        # si la caracteristica no es BERT embedding se normaliza
-        if feature_type in ['wav2vecD']:
-            print(f'No se normaliza porque es {feature_type}')
-        else:
-            print(f'Se normaliza porque es {feature_type}')
-            trans = StandardScaler()
-            min_max = MinMaxScaler()
-            # training_feats = min_max.fit_transform(training_feats)
-            training_feats = trans.fit_transform(training_feats)
-            # test_feats = np.array([min_max.transform(f) for f in test_feats])
-            test_feats = np.array([trans.transform(f) for f in test_feats])
+        trans = StandardScaler()
+        min_max = MinMaxScaler()
+        training_feats = min_max.fit_transform(training_feats)
+        training_feats = trans.fit_transform(training_feats)
+        test_feats = np.array([min_max.transform(f) for f in test_feats])
+        test_feats = np.array([trans.transform(f) for f in test_feats])
 
-    elif model_name == 'MLP' or model_name == 'MLP2':
+    elif model_name == 'MLP':
         model = MLPClassifier(hidden_layer_sizes=model_args['hidden_layer_sizes'],
                               solver=model_args['solver'], alpha=model_args['alpha'],
                               learning_rate_init=model_args['learning_rate_init'],
@@ -916,12 +515,13 @@ def make_feats(path_to_wav: str, audio_id: pd.DataFrame, labels: pd.DataFrame, f
         # Prepare features
         # print(f'Procesando: {os.path.join(path_to_wav, audio_id)}')
         try:
-            # print('hola')
+            #print('hola')
             F = FE.extract(os.path.join(path_to_wav, audio_id), audio_id)
-
+                  
+        
             print(F)
             print(f'F en train_all: {F.shape}')
-            if not (np.isnan(F).any() or np.isinf(F).any()):
+            if not(np.isnan(F).any() or np.isinf(F).any()):
                 egs.append(np.concatenate((np.array(F), np.array([label] * F.shape[0]).reshape(F.shape[0], 1)), axis=1))
             else:
                 print(f'Problema con: {os.path.join(path_to_wav, audio_id)}')
@@ -963,7 +563,7 @@ def make_train_test_subsets(metadata: pd.DataFrame, test_size: float = 0.3, k_fo
         PATIENT_ID_COLUMN = 'ID'
         CLASS_COLUMN = 'AD_status'
         AUDIO_ID_COLUMN = 'root'  # ruta al audio
-        TT_COLUMN = 'tt'  # Train-Test column
+        TT_COLUMN = 'tt' # Train-Test column
 
         # Filtrar los datos de entrenamiento y prueba en base a la columna 'tt'
         audio_data_train = metadata[metadata[TT_COLUMN] == 'train']
@@ -1064,7 +664,7 @@ if __name__ == "__main__":
     root_path = args.r
     data_path = os.path.join(root_path, 'dataset/')
     wav_path = os.path.join(data_path, 'Extracted_data/')
-    csv_path = os.path.join(data_path, 'ADReSS_db.csv')  # poner nombre DB
+    csv_path = os.path.join(data_path, 'ADReSS_db.csv')   # poner nombre DB
     results_path = os.path.join(root_path, 'results')
     # Data filters
     all_filters = load_config_from_json(os.path.join(root_path, 'config', 'filter_config.json'))
@@ -1082,11 +682,10 @@ if __name__ == "__main__":
     # Run the experiments
     for exp_filter in all_filters:
         # Select the feats
-        all_feats = ['embMFCC', 'embRasta', 'embBasicSpectral', 'embVoicing',
-                     'embEnergy', 'MFCC_spectral', 'XVector', 'wav2vec',
-                     'BERT_embedding', 'bert_MFCC', 'bert_wav2vec']
-
-        extra_features = [False, True]  # volver a poner true
+        all_feats = ['BERT_embedding', 'XVector', 'wav2vec',
+                     'embMFCC', 'embRasta', 'embBasicSpectral', 'embVoicing', 'embEnergy',
+                     'bert_MFCC', 'bert_wav2vec', 'MFCC_spectral']
+        extra_features = [True, False] # volver a poner true
 
         for feat in all_feats:
             feats_config['feature_type'] = feat
@@ -1103,8 +702,8 @@ if __name__ == "__main__":
                 hidden_layer_size = ((feature_size + classes) // 2,)  # Convertir a entero y tupla
 
                 # Asignar el nuevo valor en el modelo MLP
-                if 'MLP2' in MODELS:
-                    MODELS['MLP2']['hidden_layer_sizes'] = hidden_layer_size
+                if 'MLP' in MODELS:
+                    MODELS['MLP']['hidden_layer_sizes'] = hidden_layer_size
                 # ---------------------------------------------------
 
                 # Select the model

@@ -1,22 +1,32 @@
 [
     {
-        "audio_type": ["ALL"],
-        "audio_moment": ["ALL"]
+        "audio_type": ["cough-shallow"]
     },
     {
-        "audio_type": ["/a/"],
-        "audio_moment": ["before"]
+        "audio_type": ["cough-heavy"]
     },
     {
-        "audio_type": ["/a/"],
-        "audio_moment": ["after"]
+        "audio_type": ["breathing-shallow"]
     },
     {
-        "audio_type": ["/cough/"],
-        "audio_moment": ["before"]
+        "audio_type": ["breathing-deep"]
     },
     {
-        "audio_type": ["/cough/"],
-        "audio_moment": ["after"]
+        "audio_type": ["counting-normal"]
+    },
+    {
+        "audio_type": ["counting-fast"]
+    },
+    {
+        "audio_type": ["vowel-a"]
+    },
+    {
+        "audio_type": ["vowel-e"]
+    },
+    {
+        "audio_type": ["vowel-o"]
+    },
+    {
+        "audio_type": ["ALL"]
     }
 ]

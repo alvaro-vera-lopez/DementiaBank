@@ -1,0 +1,46 @@
+{
+    "embMFCC": {
+        "True": [288],
+        "False": [96]
+    },
+    "embRasta": {
+        "True": [234],
+        "False": [78]
+    },
+    "embBasicSpectral": {
+        "True": [135],
+        "False": [45]
+    },
+    "embVoicing": {
+        "True": [54],
+        "False": [18]
+    },
+    "embEnergy": {
+        "True": [36],
+        "False": [12]
+    },
+    "BERT_embedding": {
+        "True": [768],
+        "False": [768]
+    },
+    "XVector": {
+        "True": [512],
+        "False": [512]
+    },
+    "wav2vec": {
+        "True": [2304],
+        "False": [2304]
+    },
+    "bert_MFCC": {
+        "True": [1056],
+        "False": [864]
+    },
+    "bert_wav2vec": {
+        "True": [3072],
+        "False": [3072]
+    },
+    "MFCC_spectral": {
+        "True": [423],
+        "False": [141]
+    }
+}

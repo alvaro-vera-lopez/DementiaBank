@@ -1,14 +1,30 @@
 {
     "LogisticRegression": {
+                            "c": 1,
+                            "max_iter": 40,
+                            "solver": "liblinear",
+                            "penalty": "l1",
+                            "class_weight": "balanced",
+                            "verbose": true
+    },
+    "LogisticRegression2": {
+                            "c": 0.1,
+                            "max_iter": 40,
+                            "solver": "liblinear",
+                            "penalty": "l1",
+                            "class_weight": "balanced",
+                            "verbose": true
+    },
+    "LogisticRegression3": {
                             "c": 0.01,
                             "max_iter": 40,
                             "solver": "liblinear",
-                            "penalty": "l2",
+                            "penalty": "l1",
                             "class_weight": "balanced",
                             "verbose": true
     },
     "RandomForest": {
-                        "n_estimators": 20,
+                        "n_estimators": 100,
                         "criterion": "gini",
                         "max_depth": null,
                         "min_samples_split": 2,
@@ -28,11 +44,43 @@
             "verbose": true
     },
 
-      "LinearSVM": {
+    "MLP2": {
+            "learning_rate_init": 0.001,
+            "alpha": 0.001,
+            "solver": "sgd",
+            "hidden_layer_sizes": [20, 20],
+            "max_iter": 500,
+            "activation": "tanh",
+            "class_weight": "balanced",
+            "verbose": true
+    },
+    "LinearSVM0": {
+                    "c": 10,
+                    "tol": 0.001,
+                    "max_iter": 1000,
+                    "class_weight": "balanced",
+                    "verbose": true
+    },
+
+    "LinearSVM": {
+                    "c": 1,
+                    "tol": 0.001,
+                    "max_iter": 1000,
+                    "class_weight": "balanced",
+                    "verbose": true
+    },
+    "LinearSVM2": {
                     "c": 0.1,
                     "tol": 0.001,
                     "max_iter": 1000,
-                    "class_weight": null,
+                    "class_weight": "balanced",
+                    "verbose": true
+    },
+    "LinearSVM3": {
+                    "c": 0.01,
+                    "tol": 0.001,
+                    "max_iter": 1000,
+                    "class_weight": "balanced",
                     "verbose": true
     }
 }
